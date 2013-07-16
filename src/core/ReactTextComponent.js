@@ -57,11 +57,11 @@ mixInto(ReactTextComponent, {
    */
   mountComponent: function(rootID) {
     ReactComponent.Mixin.mountComponent.call(this, rootID);
-    return (
+    return [
       '<span ' + ReactID.ATTR_NAME + '="' + rootID + '">' +
         escapeTextForBrowser(this.props.text) +
       '</span>'
-    );
+    ];
   },
 
   /**

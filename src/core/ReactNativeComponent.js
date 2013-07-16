@@ -88,11 +88,11 @@ ReactNativeComponent.Mixin = {
   mountComponent: function(rootID, transaction) {
     ReactComponent.Mixin.mountComponent.call(this, rootID, transaction);
     assertValidProps(this.props);
-    return (
+    return [
       this._createOpenTagMarkup() +
       this._createContentMarkup(transaction) +
       this._tagClose
-    );
+    ];
   },
 
   /**
@@ -161,9 +161,10 @@ ReactNativeComponent.Mixin = {
         return escapeTextForBrowser(contentToUse);
       } else if (childrenToUse != null) {
         return this.mountMultiChild(
+          0, '',
           flattenChildren(childrenToUse),
           transaction
-        );
+        ).join('');
       }
     }
     return '';
@@ -320,7 +321,7 @@ ReactNativeComponent.Mixin = {
     if (contentToUse != null) {
       var childrenRemoved = lastUsedChildren != null && childrenToUse == null;
       if (childrenRemoved) {
-        this.updateMultiChild(null, transaction);
+        this.updateMultiChild(0, '', null, transaction);
       }
       if (lastUsedContent !== contentToUse) {
         ReactComponent.DOMIDOperations.updateTextContentByID(
@@ -336,7 +337,11 @@ ReactNativeComponent.Mixin = {
           ''
         );
       }
-      this.updateMultiChild(flattenChildren(nextProps.children), transaction);
+      this.updateMultiChild(
+        0, '',
+        flattenChildren(nextProps.children),
+        transaction
+      );
     }
   },
 
@@ -349,7 +354,7 @@ ReactNativeComponent.Mixin = {
   unmountComponent: function() {
     ReactEventEmitter.deleteAllListeners(this._rootNodeID);
     ReactComponent.Mixin.unmountComponent.call(this);
-    this.unmountMultiChild();
+    this.unmountMultiChild(0, '');
   }
 
 };

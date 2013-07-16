@@ -344,7 +344,8 @@ var ReactComponent = {
      *
      * @param {string} rootID DOM ID of the root node.
      * @param {ReactReconcileTransaction} transaction
-     * @return {?string} Rendered markup to be inserted into the DOM.
+     * @return {array<string>?} String markup for elements to be inserted into
+     * the DOM (one string for each DOM element).
      * @internal
      */
     mountComponent: function(rootID, transaction) {
@@ -359,7 +360,7 @@ var ReactComponent = {
       }
       this._rootNodeID = rootID;
       this._lifeCycleState = ComponentLifeCycle.MOUNTED;
-      // Effectively: return '';
+      // Effectively: return [];
     },
 
     /**

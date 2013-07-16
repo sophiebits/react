@@ -475,7 +475,7 @@ var ReactCompositeComponentMixin = {
    *
    * @param {string} rootID DOM ID of the root node.
    * @param {ReactReconcileTransaction} transaction
-   * @return {?string} Rendered markup to be inserted into the DOM.
+   * @return {array<string>} Rendered markup to be inserted into the DOM.
    * @final
    * @internal
    */

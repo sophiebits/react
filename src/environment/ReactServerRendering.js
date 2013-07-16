@@ -33,7 +33,7 @@ function renderComponentToString(component, callback) {
   transaction.reinitializeTransaction();
   try {
     transaction.perform(function() {
-      callback(component.mountComponent(id, transaction));
+      callback(component.mountComponent(id, transaction).join(''));
     }, null);
   } finally {
     ReactReconcileTransaction.release(transaction);

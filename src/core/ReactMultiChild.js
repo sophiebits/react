@@ -84,15 +84,23 @@ var ReactMultiChildMixin = {
     }
   },
 
-  unmountMultiChild: function() {
+  unmountMultiChild: function(offset, prefix) {
     var renderedChildren = this._renderedChildren;
+    var allRemoved = true;
     for (var name in renderedChildren) {
+      // Use lastIndexOf for startsWith: http://jsperf.com/js-startswith/6
       if (renderedChildren.hasOwnProperty(name) && renderedChildren[name]) {
-        var renderedChild = renderedChildren[name];
-        renderedChild.unmountComponent && renderedChild.unmountComponent();
+        if (name.lastIndexOf(prefix, 0) === 0) {
+          var renderedChild = renderedChildren[name];
+          renderedChild.unmountComponent && renderedChild.unmountComponent();
+        } else {
+          allRemoved = false;
+        }
       }
     }
-    this._renderedChildren = null;
+    if (allRemoved) {
+      this._renderedChildren = null;
+    }
   },
 
   /**
@@ -107,16 +115,17 @@ var ReactMultiChildMixin = {
    * @param {?Object} children Flattened children object.
    * @return {!String} The rendered markup.
    */
-  mountMultiChild: function(children, transaction) {
-    var accum = '';
+  mountMultiChild: function(offset, prefix, children, transaction) {
+    var accum = [];
     var index = 0;
     for (var name in children) {
       var child = children[name];
       if (children.hasOwnProperty(name) && child) {
-        accum += child.mountComponent(
-          this._rootNodeID + '.' + name,
+        var nodesMarkup = child.mountComponent(
+          this._rootNodeID + '.' + prefix + name,
           transaction
         );
+        accum.push.apply(accum, nodesMarkup);
         child._domIndex = index;
         index++;
       }
@@ -140,7 +149,7 @@ var ReactMultiChildMixin = {
    *
    * @param {?Object} children Flattened children object.
    */
-  updateMultiChild: function(nextChildren, transaction) {
+  updateMultiChild: function(offset, prefix, nextChildren, transaction) {
     if (!nextChildren && !this._renderedChildren) {
       return;
     } else if (nextChildren && !this._renderedChildren) {
@@ -148,7 +157,7 @@ var ReactMultiChildMixin = {
     } else if (!nextChildren && this._renderedChildren) {
       nextChildren = {};
     }
-    var rootDomIdDot = this._rootNodeID + '.';
+    var rootDomIdDotPrefix = this._rootNodeID + '.' + prefix;
     var markupBuffer = null;  // Accumulate adjacent new children markup.
     var numPendingInsert = 0; // How many root nodes are waiting in markupBuffer
     var loopDomIndex = 0;     // Index of loop through new children.
@@ -159,12 +168,15 @@ var ReactMultiChildMixin = {
       var nextChild = nextChildren[name];
       if (shouldManageExisting(curChild, nextChild)) {
         if (markupBuffer) {
-          this.enqueueMarkupAt(markupBuffer, loopDomIndex - numPendingInsert);
+          this.enqueueMarkupAt(
+            markupBuffer,
+            offset + loopDomIndex - numPendingInsert
+          );
           markupBuffer = null;
         }
         numPendingInsert = 0;
         if (curChild._domIndex < curChildrenDOMIndex) { // (Comment 2)
-          this.enqueueMove(curChild._domIndex, loopDomIndex);
+          this.enqueueMove(offset + curChild._domIndex, offset + loopDomIndex);
         }
         curChildrenDOMIndex = Math.max(curChild._domIndex, curChildrenDOMIndex);
         curChild.receiveProps(nextChild.props, transaction);
@@ -178,7 +190,7 @@ var ReactMultiChildMixin = {
         if (nextChild) {              // !shouldUpdate && nextChild => insert
           this._renderedChildren[name] = nextChild;
           var nextMarkup =
-            nextChild.mountComponent(rootDomIdDot + name, transaction);
+            nextChild.mountComponent(rootDomIdDotPrefix + name, transaction);
           markupBuffer = markupBuffer ? markupBuffer + nextMarkup : nextMarkup;
           numPendingInsert++;
           nextChild._domIndex = loopDomIndex;
@@ -187,12 +199,16 @@ var ReactMultiChildMixin = {
       loopDomIndex = nextChild ? loopDomIndex + 1 : loopDomIndex;
     }
     if (markupBuffer) {
-      this.enqueueMarkupAt(markupBuffer, loopDomIndex - numPendingInsert);
+      this.enqueueMarkupAt(
+        markupBuffer,
+        offset + loopDomIndex - numPendingInsert
+      );
     }
     for (var childName in this._renderedChildren) { // from other direction
       if (!this._renderedChildren.hasOwnProperty(childName)) { continue; }
       var child = this._renderedChildren[childName];
-      if (child && !nextChildren[childName]) {
+      if (child && !nextChildren[childName] &&
+          childName.lastIndexOf(prefix, 0) === 0) {
         this.enqueueUnmountChildByName(childName, child);
       }
     }
