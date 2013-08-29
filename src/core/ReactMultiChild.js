@@ -187,7 +187,6 @@ function mountChildren(component, children, transaction) {
       // Inlined for performance, see `ReactInstanceHandles.createReactID`.
       var rootID = component._rootNodeID + '.' + name;
       var mountImage = child.mountComponent(rootID, transaction);
-      child._mountImage = mountImage;
       child._mountIndex = index;
       mountImages.push(mountImage);
       index++;
@@ -345,10 +344,11 @@ function moveChild(component, child, toIndex, lastIndex) {
  *
  * @param {ReactComponent} component Parent component.
  * @param {ReactComponent} child Component to create.
+ * @param {string} mountImage Markup to insert.
  * @protected
  */
-function createChild(component, child) {
-  enqueueMarkup(component._rootNodeID, child._mountImage, child._mountIndex);
+function createChild(component, child, mountImage) {
+  enqueueMarkup(component._rootNodeID, mountImage, child._mountIndex);
 }
 
 /**
@@ -389,9 +389,8 @@ function _mountChildByNameAtIndex(component, child, name, index, transaction) {
   // Inlined for performance, see `ReactInstanceHandles.createReactID`.
   var rootID = component._rootNodeID + '.' + name;
   var mountImage = child.mountComponent(rootID, transaction);
-  child._mountImage = mountImage;
   child._mountIndex = index;
-  createChild(component, child);
+  createChild(component, child, mountImage);
   component._renderedChildren = component._renderedChildren || {};
   component._renderedChildren[name] = child;
 }
@@ -409,7 +408,6 @@ function _mountChildByNameAtIndex(component, child, name, index, transaction) {
 function _unmountChildByName(component, child, name) {
   if (ReactComponent.isValidComponent(child)) {
     removeChild(component, child);
-    child._mountImage = null;
     child._mountIndex = null;
     child.unmountComponent();
     delete component._renderedChildren[name];
