@@ -22,6 +22,8 @@
 var ReactComponent = require('ReactComponent');
 var ReactMultiChildUpdateTypes = require('ReactMultiChildUpdateTypes');
 
+var invariant = require('invariant');
+
 /**
  * Given a `curChild` and `newChild`, determines if `curChild` should be
  * updated as opposed to being destroyed or replaced.
@@ -197,7 +199,7 @@ function mountChildren(component, children, transaction) {
 }
 
 /**
- * Replaces any rendered children with a text content string.
+ * Sets the text content, assuming that the component's root node is empty.
  *
  * @param {ReactComponent} component Parent component.
  * @param {string} nextContent String of content.
@@ -207,12 +209,13 @@ function updateTextContent(component, nextContent) {
   updateDepth++;
   try {
     var prevChildren = component._renderedChildren;
-    // Remove any rendered children.
     for (var name in prevChildren) {
-      if (prevChildren.hasOwnProperty(name) &&
-          prevChildren[name]) {
-        _unmountChildByName(component, prevChildren[name], name);
-      }
+      invariant(
+        false,
+        "ReactMultiChild: All children should be removed before " +
+        "updateTextContent is called; found child %s.",
+        name
+      );
     }
     // Set new text content.
     setTextContent(component, nextContent);
