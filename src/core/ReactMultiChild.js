@@ -170,260 +170,262 @@ function clearQueue() {
 }
 
 /**
- * ReactMultiChild are capable of reconciling multiple children.
+ * Generates a "mount image" for each of the supplied children. In the case
+ * of `ReactNativeComponent`, a mount image is a string of markup.
  *
- * @class ReactMultiChild
+ * @param {ReactComponent} component Parent component.
+ * @param {?object} children As returned by `flattenChildren`.
+ * @return {array} An array of mounted representations.
  * @internal
  */
-var ReactMultiChild = {
-
-  /**
-   * Provides common functionality for components that must reconcile multiple
-   * children. This is used by `ReactNativeComponent` to mount, update, and
-   * unmount child components.
-   *
-   * @lends {ReactMultiChild.prototype}
-   */
-  Mixin: {
-
-    /**
-     * Generates a "mount image" for each of the supplied children. In the case
-     * of `ReactNativeComponent`, a mount image is a string of markup.
-     *
-     * @param {?object} children As returned by `flattenChildren`.
-     * @return {array} An array of mounted representations.
-     * @internal
-     */
-    mountChildren: function(children, transaction) {
-      var mountImages = [];
-      var index = 0;
-      for (var name in children) {
-        var child = children[name];
-        if (children.hasOwnProperty(name) && child) {
-          // Inlined for performance, see `ReactInstanceHandles.createReactID`.
-          var rootID = this._rootNodeID + '.' + name;
-          var mountImage = child.mountComponent(rootID, transaction);
-          child._mountImage = mountImage;
-          child._mountIndex = index;
-          mountImages.push(mountImage);
-          index++;
-        }
-      }
-      this._renderedChildren = children;
-      return mountImages;
-    },
-
-    /**
-     * Replaces any rendered children with a text content string.
-     *
-     * @param {string} nextContent String of content.
-     * @internal
-     */
-    updateTextContent: function(nextContent) {
-      updateDepth++;
-      try {
-        var prevChildren = this._renderedChildren;
-        // Remove any rendered children.
-        for (var name in prevChildren) {
-          if (prevChildren.hasOwnProperty(name) &&
-              prevChildren[name]) {
-            this._unmountChildByName(prevChildren[name], name);
-          }
-        }
-        // Set new text content.
-        this.setTextContent(nextContent);
-      } catch (error) {
-        updateDepth--;
-        updateDepth || clearQueue();
-        throw error;
-      }
-      updateDepth--;
-      updateDepth || processQueue();
-    },
-
-    /**
-     * Updates the rendered children with new children.
-     *
-     * @param {?object} nextChildren As returned by `flattenChildren`.
-     * @param {ReactReconcileTransaction} transaction
-     * @internal
-     */
-    updateChildren: function(nextChildren, transaction) {
-      updateDepth++;
-      try {
-        this._updateChildren(nextChildren, transaction);
-      } catch (error) {
-        updateDepth--;
-        updateDepth || clearQueue();
-        throw error;
-      }
-      updateDepth--;
-      updateDepth || processQueue();
-    },
-
-    /**
-     * Improve performance by isolating this hot code path from the try/catch
-     * block in `updateChildren`.
-     *
-     * @param {?object} nextChildren As returned by `flattenChildren`.
-     * @param {ReactReconcileTransaction} transaction
-     * @final
-     * @protected
-     */
-    _updateChildren: function(nextChildren, transaction) {
-      var prevChildren = this._renderedChildren;
-      if (!nextChildren && !prevChildren) {
-        return;
-      }
-      var name;
-      // `nextIndex` will increment for each child in `nextChildren`, but
-      // `lastIndex` will be the last index visited in `prevChildren`.
-      var lastIndex = 0;
-      var nextIndex = 0;
-      for (name in nextChildren) {
-        if (!nextChildren.hasOwnProperty(name)) {
-          continue;
-        }
-        var prevChild = prevChildren && prevChildren[name];
-        var nextChild = nextChildren[name];
-        if (shouldUpdateChild(prevChild, nextChild)) {
-          this.moveChild(prevChild, nextIndex, lastIndex);
-          lastIndex = Math.max(prevChild._mountIndex, lastIndex);
-          prevChild.receiveProps(nextChild.props, transaction);
-          prevChild._mountIndex = nextIndex;
-        } else {
-          if (prevChild) {
-            // Update `lastIndex` before `_mountIndex` gets unset by unmounting.
-            lastIndex = Math.max(prevChild._mountIndex, lastIndex);
-            this._unmountChildByName(prevChild, name);
-          }
-          if (nextChild) {
-            this._mountChildByNameAtIndex(
-              nextChild, name, nextIndex, transaction
-            );
-          }
-        }
-        if (nextChild) {
-          nextIndex++;
-        }
-      }
-      // Remove children that are no longer present.
-      for (name in prevChildren) {
-        if (prevChildren.hasOwnProperty(name) &&
-            prevChildren[name] &&
-            !(nextChildren && nextChildren[name])) {
-          this._unmountChildByName(prevChildren[name], name);
-        }
-      }
-    },
-
-    /**
-     * Unmounts all rendered children. This should be used to clean up children
-     * when this component is unmounted.
-     *
-     * @internal
-     */
-    unmountChildren: function() {
-      var renderedChildren = this._renderedChildren;
-      for (var name in renderedChildren) {
-        var renderedChild = renderedChildren[name];
-        if (renderedChild && renderedChild.unmountComponent) {
-          renderedChild.unmountComponent();
-        }
-      }
-      this._renderedChildren = null;
-    },
-
-    /**
-     * Moves a child component to the supplied index.
-     *
-     * @param {ReactComponent} child Component to move.
-     * @param {number} toIndex Destination index of the element.
-     * @param {number} lastIndex Last index visited of the siblings of `child`.
-     * @protected
-     */
-    moveChild: function(child, toIndex, lastIndex) {
-      // If the index of `child` is less than `lastIndex`, then it needs to
-      // be moved. Otherwise, we do not need to move it because a child will be
-      // inserted or moved before `child`.
-      if (child._mountIndex < lastIndex) {
-        enqueueMove(this._rootNodeID, child._mountIndex, toIndex);
-      }
-    },
-
-    /**
-     * Creates a child component.
-     *
-     * @param {ReactComponent} child Component to create.
-     * @protected
-     */
-    createChild: function(child) {
-      enqueueMarkup(this._rootNodeID, child._mountImage, child._mountIndex);
-    },
-
-    /**
-     * Removes a child component.
-     *
-     * @param {ReactComponent} child Child to remove.
-     * @protected
-     */
-    removeChild: function(child) {
-      enqueueRemove(this._rootNodeID, child._mountIndex);
-    },
-
-    /**
-     * Sets this text content string.
-     *
-     * @param {string} textContent Text content to set.
-     * @protected
-     */
-    setTextContent: function(textContent) {
-      enqueueTextContent(this._rootNodeID, textContent);
-    },
-
-    /**
-     * Mounts a child with the supplied name.
-     *
-     * NOTE: This is part of `updateChildren` and is here for readability.
-     *
-     * @param {ReactComponent} child Component to mount.
-     * @param {string} name Name of the child.
-     * @param {number} index Index at which to insert the child.
-     * @param {ReactReconcileTransaction} transaction
-     * @private
-     */
-    _mountChildByNameAtIndex: function(child, name, index, transaction) {
+function mountChildren(component, children, transaction) {
+  var mountImages = [];
+  var index = 0;
+  for (var name in children) {
+    var child = children[name];
+    if (children.hasOwnProperty(name) && child) {
       // Inlined for performance, see `ReactInstanceHandles.createReactID`.
-      var rootID = this._rootNodeID + '.' + name;
+      var rootID = component._rootNodeID + '.' + name;
       var mountImage = child.mountComponent(rootID, transaction);
       child._mountImage = mountImage;
       child._mountIndex = index;
-      this.createChild(child);
-      this._renderedChildren = this._renderedChildren || {};
-      this._renderedChildren[name] = child;
-    },
+      mountImages.push(mountImage);
+      index++;
+    }
+  }
+  component._renderedChildren = children;
+  return mountImages;
+}
 
-    /**
-     * Unmounts a rendered child by name.
-     *
-     * NOTE: This is part of `updateChildren` and is here for readability.
-     *
-     * @param {ReactComponent} child Component to unmount.
-     * @param {string} name Name of the child in `this._renderedChildren`.
-     * @private
-     */
-    _unmountChildByName: function(child, name) {
-      if (ReactComponent.isValidComponent(child)) {
-        this.removeChild(child);
-        child._mountImage = null;
-        child._mountIndex = null;
-        child.unmountComponent();
-        delete this._renderedChildren[name];
+/**
+ * Replaces any rendered children with a text content string.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {string} nextContent String of content.
+ * @internal
+ */
+function updateTextContent(component, nextContent) {
+  updateDepth++;
+  try {
+    var prevChildren = component._renderedChildren;
+    // Remove any rendered children.
+    for (var name in prevChildren) {
+      if (prevChildren.hasOwnProperty(name) &&
+          prevChildren[name]) {
+        _unmountChildByName(component, prevChildren[name], name);
       }
     }
-
+    // Set new text content.
+    setTextContent(component, nextContent);
+  } catch (error) {
+    updateDepth--;
+    updateDepth || clearQueue();
+    throw error;
   }
+  updateDepth--;
+  updateDepth || processQueue();
+}
 
+/**
+ * Updates the rendered children with new children.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {?object} nextChildren As returned by `flattenChildren`.
+ * @param {ReactReconcileTransaction} transaction
+ * @internal
+ */
+function updateChildren(component, nextChildren, transaction) {
+  updateDepth++;
+  try {
+    _updateChildren(component, nextChildren, transaction);
+  } catch (error) {
+    updateDepth--;
+    updateDepth || clearQueue();
+    throw error;
+  }
+  updateDepth--;
+  updateDepth || processQueue();
+}
+
+/**
+ * Improve performance by isolating this hot code path from the try/catch
+ * block in `updateChildren`.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {?object} nextChildren As returned by `flattenChildren`.
+ * @param {ReactReconcileTransaction} transaction
+ * @final
+ * @protected
+ */
+function _updateChildren(component, nextChildren, transaction) {
+  var prevChildren = component._renderedChildren;
+  if (!nextChildren && !prevChildren) {
+    return;
+  }
+  var name;
+  // `nextIndex` will increment for each child in `nextChildren`, but
+  // `lastIndex` will be the last index visited in `prevChildren`.
+  var lastIndex = 0;
+  var nextIndex = 0;
+  for (name in nextChildren) {
+    if (!nextChildren.hasOwnProperty(name)) {
+      continue;
+    }
+    var prevChild = prevChildren && prevChildren[name];
+    var nextChild = nextChildren[name];
+    if (shouldUpdateChild(prevChild, nextChild)) {
+      moveChild(component, prevChild, nextIndex, lastIndex);
+      lastIndex = Math.max(prevChild._mountIndex, lastIndex);
+      prevChild.receiveProps(nextChild.props, transaction);
+      prevChild._mountIndex = nextIndex;
+    } else {
+      if (prevChild) {
+        // Update `lastIndex` before `_mountIndex` gets unset by unmounting.
+        lastIndex = Math.max(prevChild._mountIndex, lastIndex);
+        _unmountChildByName(component, prevChild, name);
+      }
+      if (nextChild) {
+        _mountChildByNameAtIndex(
+          component, nextChild, name, nextIndex, transaction
+        );
+      }
+    }
+    if (nextChild) {
+      nextIndex++;
+    }
+  }
+  // Remove children that are no longer present.
+  for (name in prevChildren) {
+    if (prevChildren.hasOwnProperty(name) &&
+        prevChildren[name] &&
+        !(nextChildren && nextChildren[name])) {
+      _unmountChildByName(component, prevChildren[name], name);
+    }
+  }
+}
+
+/**
+ * Unmounts all rendered children. This should be used to clean up children
+ * when this component is unmounted.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @internal
+ */
+function unmountChildren(component) {
+  var renderedChildren = component._renderedChildren;
+  for (var name in renderedChildren) {
+    var renderedChild = renderedChildren[name];
+    if (renderedChild && renderedChild.unmountComponent) {
+      renderedChild.unmountComponent();
+    }
+  }
+  component._renderedChildren = null;
+}
+
+/**
+ * Moves a child component to the supplied index.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {ReactComponent} child Component to move.
+ * @param {number} toIndex Destination index of the element.
+ * @param {number} lastIndex Last index visited of the siblings of `child`.
+ * @protected
+ */
+function moveChild(component, child, toIndex, lastIndex) {
+  // If the index of `child` is less than `lastIndex`, then it needs to
+  // be moved. Otherwise, we do not need to move it because a child will be
+  // inserted or moved before `child`.
+  if (child._mountIndex < lastIndex) {
+    enqueueMove(component._rootNodeID, child._mountIndex, toIndex);
+  }
+}
+
+/**
+ * Creates a child component.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {ReactComponent} child Component to create.
+ * @protected
+ */
+function createChild(component, child) {
+  enqueueMarkup(component._rootNodeID, child._mountImage, child._mountIndex);
+}
+
+/**
+ * Removes a child component.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {ReactComponent} child Child to remove.
+ * @protected
+ */
+function removeChild(component, child) {
+  enqueueRemove(component._rootNodeID, child._mountIndex);
+}
+
+/**
+ * Sets this text content string.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {string} textContent Text content to set.
+ * @protected
+ */
+function setTextContent(component, textContent) {
+  enqueueTextContent(component._rootNodeID, textContent);
+}
+
+/**
+ * Mounts a child with the supplied name.
+ *
+ * NOTE: This is part of `updateChildren` and is here for readability.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {ReactComponent} child Component to mount.
+ * @param {string} name Name of the child.
+ * @param {number} index Index at which to insert the child.
+ * @param {ReactReconcileTransaction} transaction
+ * @private
+ */
+function _mountChildByNameAtIndex(component, child, name, index, transaction) {
+  // Inlined for performance, see `ReactInstanceHandles.createReactID`.
+  var rootID = component._rootNodeID + '.' + name;
+  var mountImage = child.mountComponent(rootID, transaction);
+  child._mountImage = mountImage;
+  child._mountIndex = index;
+  createChild(component, child);
+  component._renderedChildren = component._renderedChildren || {};
+  component._renderedChildren[name] = child;
+}
+
+/**
+ * Unmounts a rendered child by name.
+ *
+ * NOTE: This is part of `updateChildren` and is here for readability.
+ *
+ * @param {ReactComponent} component Parent component.
+ * @param {ReactComponent} child Component to unmount.
+ * @param {string} name Name of the child in `component._renderedChildren`.
+ * @private
+ */
+function _unmountChildByName(component, child, name) {
+  if (ReactComponent.isValidComponent(child)) {
+    removeChild(component, child);
+    child._mountImage = null;
+    child._mountIndex = null;
+    child.unmountComponent();
+    delete component._renderedChildren[name];
+  }
+}
+
+/**
+ * ReactMultiChild contains utilities for reconciling multiple children.
+ *
+ * @internal
+ */
+var ReactMultiChild = {
+  mountChildren: mountChildren,
+  updateChildren: updateChildren,
+  updateTextContent: updateTextContent,
+  unmountChildren: unmountChildren
 };
 
 module.exports = ReactMultiChild;

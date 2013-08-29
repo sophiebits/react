@@ -165,7 +165,8 @@ ReactNativeComponent.Mixin = {
       if (contentToUse != null) {
         return escapeTextForBrowser(contentToUse);
       } else if (childrenToUse != null) {
-        var mountImages = this.mountChildren(
+        var mountImages = ReactMultiChild.mountChildren(
+          this,
           flattenChildren(childrenToUse),
           transaction
         );
@@ -330,17 +331,21 @@ ReactNativeComponent.Mixin = {
     if (contentToUse != null) {
       var childrenRemoved = lastUsedChildren != null && childrenToUse == null;
       if (childrenRemoved) {
-        this.updateChildren(null, transaction);
+        ReactMultiChild.updateChildren(this, null, transaction);
       }
       if (lastUsedContent !== contentToUse) {
-        this.updateTextContent('' + contentToUse);
+        ReactMultiChild.updateTextContent(this, '' + contentToUse);
       }
     } else {
       var contentRemoved = lastUsedContent != null && contentToUse == null;
       if (contentRemoved) {
-        this.updateTextContent('');
+        ReactMultiChild.updateTextContent(this, '');
       }
-      this.updateChildren(flattenChildren(nextProps.children), transaction);
+      ReactMultiChild.updateChildren(
+        this,
+        flattenChildren(nextProps.children),
+        transaction
+      );
     }
   },
 
@@ -353,13 +358,12 @@ ReactNativeComponent.Mixin = {
   unmountComponent: function() {
     ReactEventEmitter.deleteAllListeners(this._rootNodeID);
     ReactComponent.Mixin.unmountComponent.call(this);
-    this.unmountChildren();
+    ReactMultiChild.unmountChildren(this);
   }
 
 };
 
 mixInto(ReactNativeComponent, ReactComponent.Mixin);
 mixInto(ReactNativeComponent, ReactNativeComponent.Mixin);
-mixInto(ReactNativeComponent, ReactMultiChild.Mixin);
 
 module.exports = ReactNativeComponent;
