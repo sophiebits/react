@@ -167,6 +167,8 @@ ReactNativeComponent.Mixin = {
       } else if (childrenToUse != null) {
         var mountImages = ReactMultiChild.mountChildren(
           this,
+          this._rootNodeID,
+          this._rootNodeID + '.',
           flattenChildren(childrenToUse),
           transaction
         );
@@ -331,7 +333,13 @@ ReactNativeComponent.Mixin = {
     if (contentToUse != null) {
       var childrenRemoved = lastUsedChildren != null && childrenToUse == null;
       if (childrenRemoved) {
-        ReactMultiChild.updateChildren(this, null, transaction);
+        ReactMultiChild.updateChildren(
+          this,
+          this._rootNodeID,
+          this._rootNodeID + '.',
+          null,
+          transaction
+        );
       }
       if (lastUsedContent !== contentToUse) {
         ReactMultiChild.updateTextContent(this, '' + contentToUse);
@@ -343,6 +351,8 @@ ReactNativeComponent.Mixin = {
       }
       ReactMultiChild.updateChildren(
         this,
+        this._rootNodeID,
+        this._rootNodeID + '.',
         flattenChildren(nextProps.children),
         transaction
       );
