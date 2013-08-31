@@ -55,13 +55,13 @@ mergeInto(reactComponentExpect.prototype, {
    *   which may have a name that is unique with respect to its siblings. This
    *   method will fail if this._instance is a primitive component.
    *
-   * TL;DR: An instance may have a subComponent (this._renderedComponent) or
-   * renderedChildren, but never both. Neither will actually show up until you
-   * render the component (simply instantiating is not enough).
+   * TL;DR: An instance will have a renderedChildren object, but no children
+   * will actually show up until you render the component (simply instantiating
+   * is not enough).
    */
   expectRenderedChild: function() {
     this.toBeCompositeComponent();
-    return new reactComponentExpect(this.instance()._renderedComponent);
+    return new reactComponentExpect(this.instance()._renderedChildren['']);
   },
 
   /**

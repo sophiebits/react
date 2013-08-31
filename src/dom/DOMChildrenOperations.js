@@ -58,6 +58,16 @@ function insertChildAt(parentNode, childNode, index) {
 }
 
 /**
+ * Replace `oldNode` in the DOM with `newNode`.
+ *
+ * @param {DOMElement} oldNode
+ * @param {DOMElement} newNode
+ */
+function replaceNode(oldNode, newNode) {
+  oldNode.parentNode.replaceChild(newNode, oldNode);
+}
+
+/**
  * Operations for updating with DOM children.
  */
 var DOMChildrenOperations = {
@@ -111,6 +121,12 @@ var DOMChildrenOperations = {
             update.parentNode,
             renderedMarkup[update.markupIndex],
             update.toIndex
+          );
+          break;
+        case ReactMultiChildUpdateTypes.REPLACE_WITH_MARKUP:
+          replaceNode(
+            update.parentNode,
+            renderedMarkup[update.markupIndex]
           );
           break;
         case ReactMultiChildUpdateTypes.MOVE_EXISTING:

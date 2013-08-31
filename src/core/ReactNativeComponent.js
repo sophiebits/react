@@ -73,6 +73,7 @@ function ReactNativeComponent(tag, omitClose) {
   this._tagOpen = '<' + tag;
   this._tagClose = omitClose ? '' : '</' + tag + '>';
   this.tagName = tag.toUpperCase();
+  this._nodeCount = 1;
 }
 
 ReactNativeComponent.Mixin = {
@@ -167,7 +168,6 @@ ReactNativeComponent.Mixin = {
       } else if (childrenToUse != null) {
         var mountImages = ReactMultiChild.mountChildren(
           this,
-          this._rootNodeID,
           this._rootNodeID + '.',
           flattenChildren(childrenToUse),
           transaction
@@ -335,7 +335,6 @@ ReactNativeComponent.Mixin = {
       if (childrenRemoved) {
         ReactMultiChild.updateChildren(
           this,
-          this._rootNodeID,
           this._rootNodeID + '.',
           null,
           transaction
@@ -351,7 +350,6 @@ ReactNativeComponent.Mixin = {
       }
       ReactMultiChild.updateChildren(
         this,
-        this._rootNodeID,
         this._rootNodeID + '.',
         flattenChildren(nextProps.children),
         transaction
@@ -369,6 +367,10 @@ ReactNativeComponent.Mixin = {
     ReactEventEmitter.deleteAllListeners(this._rootNodeID);
     ReactComponent.Mixin.unmountComponent.call(this);
     ReactMultiChild.unmountChildren(this);
+  },
+
+  _getNode: function() {
+    return ReactComponent.getNodeByID(this._rootNodeID);
   }
 
 };

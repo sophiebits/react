@@ -89,7 +89,7 @@ var FriendsStatusDisplay = React.createClass({
   getStatusDisplays: function() {
     var name;
     var orderOfUsernames = [];
-    var statusDisplays = this._renderedComponent._renderedChildren;
+    var statusDisplays = this._renderedChildren['']._renderedChildren;
     for (name in statusDisplays) {
       var child = statusDisplays[name];
       var isPresent = !!child;

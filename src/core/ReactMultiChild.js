@@ -20,6 +20,7 @@
 "use strict";
 
 var ReactComponent = require('ReactComponent');
+var ReactInstanceHandles = require('ReactInstanceHandles');
 var ReactMultiChildUpdateTypes = require('ReactMultiChildUpdateTypes');
 
 var invariant = require('invariant');
@@ -82,6 +83,28 @@ function enqueueMarkup(parentID, markup, toIndex) {
     fromIndex: null,
     textContent: null,
     toIndex: toIndex
+  });
+}
+
+/**
+ * Enqueues replacing an element with a string of markup
+ *
+ * TODO: parentID is a misnomer here; fix it.
+ *
+ * @param {string} parentID ID of the element to replace.
+ * @param {string} markup Markup that replaces the element.
+ * @private
+ */
+function enqueueReplaceWithMarkup(parentID, markup) {
+  // NOTE: Null values reduce hidden classes.
+  updateQueue.push({
+    parentID: parentID,
+    parentNode: null,
+    type: ReactMultiChildUpdateTypes.REPLACE_WITH_MARKUP,
+    markupIndex: markupQueue.push(markup) - 1,
+    textContent: null,
+    fromIndex: null,
+    toIndex: null
   });
 }
 
@@ -176,18 +199,12 @@ function clearQueue() {
  * of `ReactNativeComponent`, a mount image is a string of markup.
  *
  * @param {ReactComponent} component Parent component.
- * @param {string} nodeID Parent DOM node ID.
  * @param {string} idPrefix ID prefix for component children.
  * @param {?object} children As returned by `flattenChildren`.
  * @return {array} An array of mounted representations.
  * @internal
  */
-function mountChildren(
-    component,
-    nodeID,
-    idPrefix,
-    children,
-    transaction) {
+function mountChildren(component, idPrefix, children, transaction) {
   var mountImages = [];
   var index = 0;
   for (var name in children) {
@@ -196,11 +213,16 @@ function mountChildren(
       var rootID = idPrefix + name;
       var mountImage = child.mountComponent(rootID, transaction);
       child._mountIndex = index;
+      child._parentComponent = component;
       mountImages.push(mountImage);
-      index++;
+      index += child._nodeCount;
     }
   }
   component._renderedChildren = children;
+  // Update nodeCount if this is a composite component
+  if (component._rootNodeID === idPrefix) {
+    component._nodeCount = index;
+  }
   return mountImages;
 }
 
@@ -238,23 +260,16 @@ function updateTextContent(component, nextContent) {
  * Updates the rendered children with new children.
  *
  * @param {ReactComponent} component Parent component.
- * @param {string} nodeID Parent DOM node ID.
  * @param {string} idPrefix ID prefix for component children.
  * @param {?object} nextChildren As returned by `flattenChildren`.
  * @param {ReactReconcileTransaction} transaction
  * @internal
  */
-function updateChildren(
-    component,
-    nodeID,
-    idPrefix,
-    nextChildren,
-    transaction) {
+function updateChildren(component, idPrefix, nextChildren, transaction) {
   updateDepth++;
   try {
     _updateChildren(
       component,
-      nodeID,
       idPrefix,
       nextChildren,
       transaction
@@ -273,7 +288,6 @@ function updateChildren(
  * block in `updateChildren`.
  *
  * @param {ReactComponent} component Parent component.
- * @param {string} nodeID Parent DOM node ID.
  * @param {string} idPrefix ID prefix for component children.
  * @param {?object} nextChildren As returned by `flattenChildren`.
  * @param {ReactReconcileTransaction} transaction
@@ -282,16 +296,43 @@ function updateChildren(
  */
 function _updateChildren(
     component,
-    nodeID,
     idPrefix,
     nextChildren,
     transaction) {
   var prevChildren = component._renderedChildren;
+  // If idPrefix ends in the separator `.` then component is the DOM node and
+  // we're managing its children. Otherwise, component is one or more children
+  // of a higher parent node.
+  // TODO: Determine this in a simpler way
+  var nodeID = idPrefix.charAt(idPrefix.length - 1) === '.' ?
+    component._rootNodeID :
+    ReactInstanceHandles.getParentID(component._rootNodeID);
+  if (nodeID === '') {
+    // This component is the top-level component and we're replacing the
+    // current single child with a new single child. Since root-level
+    // containers don't have IDs, we can't refer to them directly and instead
+    // must use 'replace with markup' here.
+    // TODO: Unify this manipulation code with the rest if possible
+    var prevChild = prevChildren[''];
+    var nextChild = nextChildren[''];
+    if (shouldUpdateChild(prevChild, nextChild)) {
+      prevChild.receiveProps(nextChild.props, transaction);
+    } else {
+      // These two IDs are actually the same! But nothing should rely on that.
+      var prevID = prevChild._rootNodeID;
+      var nextID = component._rootNodeID;
+      prevChild.unmountComponent();
+      var markup = nextChild.mountComponent(nextID, transaction);
+      enqueueReplaceWithMarkup(prevID, markup);
+      component._renderedChildren[''] = nextChild;
+    }
+    return;
+  }
   if (!nextChildren && !prevChildren) {
     return;
   }
   var name;
-  // `nextIndex` will increment for each child in `nextChildren`, but
+  // `nextIndex` will increment for each child node in `nextChildren`, but
   // `lastIndex` will be the last index visited in `prevChildren`.
   var lastIndex = 0;
   var nextIndex = 0;
@@ -301,11 +342,13 @@ function _updateChildren(
     }
     var prevChild = prevChildren && prevChildren[name];
     var nextChild = nextChildren[name];
+    var mountedChild = null;
     if (shouldUpdateChild(prevChild, nextChild)) {
       moveChild(nodeID, prevChild, nextIndex, lastIndex);
       lastIndex = Math.max(prevChild._mountIndex, lastIndex);
       prevChild.receiveProps(nextChild.props, transaction);
       prevChild._mountIndex = nextIndex;
+      mountedChild = prevChild;
     } else {
       if (prevChild) {
         // Update `lastIndex` before `_mountIndex` gets unset by unmounting.
@@ -322,10 +365,11 @@ function _updateChildren(
           nextIndex,
           transaction
         );
+        mountedChild = nextChild;
       }
     }
-    if (nextChild) {
-      nextIndex++;
+    if (mountedChild) {
+      nextIndex += mountedChild._nodeCount;
     }
   }
   // Remove children that are no longer present.
@@ -335,6 +379,14 @@ function _updateChildren(
         !(nextChildren && nextChildren[name])) {
       _unmountChildByName(component, nodeID, prevChildren[name], name);
     }
+  }
+  // Update node counts for parent components
+  var nodeCountDiff = nextIndex - component._nodeCount;
+  component._nodeCount += nodeCountDiff;
+  var ancestor = component._parentComponent;
+  while (ancestor && ancestor._rootNodeID !== nodeID) {
+    ancestor._nodeCount += nodeCountDiff;
+    ancestor = ancestor._parentComponent;
   }
 }
 
@@ -350,10 +402,13 @@ function unmountChildren(component) {
   for (var name in renderedChildren) {
     var renderedChild = renderedChildren[name];
     if (renderedChild && renderedChild.unmountComponent) {
+      renderedChild._mountIndex = null;
+      renderedChild._parentComponent = null;
       renderedChild.unmountComponent();
     }
   }
   component._renderedChildren = null;
+  component._nodeCount = null;
 }
 
 /**
@@ -434,6 +489,7 @@ function _mountChildByNameAtIndex(
   var rootID = idPrefix + name;
   var mountImage = child.mountComponent(rootID, transaction);
   child._mountIndex = index;
+  child._parentComponent = component;
   createChild(nodeID, child, mountImage);
   component._renderedChildren = component._renderedChildren || {};
   component._renderedChildren[name] = child;
@@ -454,6 +510,7 @@ function _unmountChildByName(component, nodeID, child, name) {
   if (ReactComponent.isValidComponent(child)) {
     removeChild(nodeID, child);
     child._mountIndex = null;
+    child._parentComponent = null;
     child.unmountComponent();
     delete component._renderedChildren[name];
   }

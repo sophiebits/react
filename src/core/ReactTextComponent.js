@@ -42,6 +42,7 @@ var mixInto = require('mixInto');
  */
 var ReactTextComponent = function(initialText) {
   this.construct({text: initialText});
+  this._nodeCount = 1;
 };
 
 mixInto(ReactTextComponent, ReactComponent.Mixin);
@@ -79,6 +80,10 @@ mixInto(ReactTextComponent, {
         nextProps.text
       );
     }
+  },
+
+  _getNode: function() {
+    return ReactComponent.getNodeByID(this._rootNodeID);
   }
 
 });

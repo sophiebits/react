@@ -198,6 +198,13 @@ var ReactComponent = {
   DOMIDOperations: ReactComponentEnvironment.DOMIDOperations,
 
   /**
+   * Injectable method that returns a platform-specific node reference.
+   *
+   * @private
+   */
+  getNodeByID: ReactComponentEnvironment.getNodeByID,
+
+  /**
    * Optionally injectable environment dependent cleanup hook. (server vs.
    * browser etc). Example: A browser system caches DOM nodes based on component
    * ID and must remove that cache entry when this instance is unmounted.

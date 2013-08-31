@@ -54,13 +54,15 @@ var ReactComponentBrowserEnvironment = {
         this.isMounted(),
         'getDOMNode(): A component must be mounted to have a DOM node.'
       );
-      return ReactMount.getNode(this._rootNodeID);
+      return this._getNode();
     }
   },
 
   ReactReconcileTransaction: ReactReconcileTransaction,
 
   DOMIDOperations: ReactDOMIDOperations,
+
+  getNodeByID: ReactMount.getNode,
 
   /**
    * If a particular environment requires that some resources be cleaned up,

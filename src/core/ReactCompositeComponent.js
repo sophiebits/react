@@ -20,6 +20,7 @@
 
 var ReactComponent = require('ReactComponent');
 var ReactCurrentOwner = require('ReactCurrentOwner');
+var ReactMultiChild = require('ReactMultiChild');
 var ReactOwner = require('ReactOwner');
 var ReactPerf = require('ReactPerf');
 var ReactPropTransferer = require('ReactPropTransferer');
@@ -513,6 +514,7 @@ var ReactCompositeComponentMixin = {
     this.state = null;
     this._pendingState = null;
     this._compositeLifeCycleState = null;
+    this._nodeCount = null;
   },
 
   /**
@@ -563,15 +565,23 @@ var ReactCompositeComponentMixin = {
         }
       }
 
-      this._renderedComponent = this._renderValidatedComponent();
+      var renderedComponent = this._renderValidatedComponent();
 
       // Done with mounting, `setState` will now trigger UI changes.
       this._compositeLifeCycleState = null;
-      var markup = this._renderedComponent.mountComponent(rootID, transaction);
+      var markup = ReactMultiChild.mountChildren(
+        this,
+        this._rootNodeID,
+        // With a single child, use the name '' so as to not add to the ID
+        // length unnecessarily -- using any other string makes it more
+        // complicated to keep track of the root-level containers
+        {'': renderedComponent},
+        transaction
+      );
       if (this.componentDidMount) {
         transaction.getReactOnDOMReady().enqueue(this, this.componentDidMount);
       }
-      return markup;
+      return markup.join('');
     }
   ),
 
@@ -591,8 +601,7 @@ var ReactCompositeComponentMixin = {
     this._defaultProps = null;
 
     ReactComponent.Mixin.unmountComponent.call(this);
-    this._renderedComponent.unmountComponent();
-    this._renderedComponent = null;
+    ReactMultiChild.unmountChildren(this);
 
     if (this.refs) {
       this.refs = null;
@@ -779,22 +788,16 @@ var ReactCompositeComponentMixin = {
     'updateComponent',
     function(transaction, prevProps, prevState) {
       ReactComponent.Mixin.updateComponent.call(this, transaction, prevProps);
-      var currentComponent = this._renderedComponent;
       var nextComponent = this._renderValidatedComponent();
-      if (currentComponent.constructor === nextComponent.constructor) {
-        currentComponent.receiveProps(nextComponent.props, transaction);
-      } else {
-        // These two IDs are actually the same! But nothing should rely on that.
-        var thisID = this._rootNodeID;
-        var currentComponentID = currentComponent._rootNodeID;
-        currentComponent.unmountComponent();
-        var nextMarkup = nextComponent.mountComponent(thisID, transaction);
-        ReactComponent.DOMIDOperations.dangerouslyReplaceNodeWithMarkupByID(
-          currentComponentID,
-          nextMarkup
-        );
-        this._renderedComponent = nextComponent;
-      }
+      var markup = ReactMultiChild.updateChildren(
+        this,
+        this._rootNodeID,
+        // With a single child, use the name '' so as to not add to the ID
+        // length unnecessarily -- using any other string makes it more
+        // complicated to keep track of the root-level containers
+        {'': nextComponent},
+        transaction
+      );
     }
   ),
 
@@ -850,6 +853,10 @@ var ReactCompositeComponentMixin = {
       this.constructor.displayName || 'ReactCompositeComponent'
     );
     return renderedComponent;
+  },
+
+  _getNode: function() {
+    return this._renderedChildren['']._getNode();
   },
 
   /**

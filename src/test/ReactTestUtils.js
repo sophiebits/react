@@ -84,20 +84,14 @@ var ReactTestUtils = {
       return [];
     }
     var ret = test(inst) ? [inst] : [];
-    if (ReactTestUtils.isDOMComponent(inst)) {
-      var renderedChildren = inst._renderedChildren;
-      var key;
-      for (key in renderedChildren) {
-        if (!renderedChildren.hasOwnProperty(key)) {
-          continue;
-        }
-        ret = ret.concat(
-          ReactTestUtils.findAllInRenderedTree(renderedChildren[key], test)
-        );
+    var renderedChildren = inst._renderedChildren;
+    var key;
+    for (key in renderedChildren) {
+      if (!renderedChildren.hasOwnProperty(key)) {
+        continue;
       }
-    } else if (ReactTestUtils.isCompositeComponent(inst)) {
       ret = ret.concat(
-        ReactTestUtils.findAllInRenderedTree(inst._renderedComponent, test)
+        ReactTestUtils.findAllInRenderedTree(renderedChildren[key], test)
       );
     }
     return ret;
