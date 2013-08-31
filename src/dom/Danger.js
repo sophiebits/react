@@ -103,26 +103,6 @@ var Danger = {
       );
     }
     return resultList;
-  },
-
-  /**
-   * Replaces a node with a string of markup at its current position within its
-   * parent. The markup must render into a single root node.
-   *
-   * @param {DOMElement} oldChild Child node to replace.
-   * @param {string} markup Markup to render in place of the child node.
-   * @internal
-   */
-  dangerouslyReplaceNodeWithMarkup: function(oldChild, markup) {
-    invariant(
-      ExecutionEnvironment.canUseDOM,
-      'dangerouslyReplaceNodeWithMarkup(...): Cannot render markup in a ' +
-      'worker thread. This is likely a bug in the framework. Please report ' +
-      'immediately.'
-    );
-    invariant(markup, 'dangerouslyReplaceNodeWithMarkup(...): Missing markup.');
-    var newChild = createNodesFromMarkup(markup, emptyFunction)[0];
-    oldChild.parentNode.replaceChild(newChild, oldChild);
   }
 
 };
