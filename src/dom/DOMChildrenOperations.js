@@ -81,25 +81,29 @@ var DOMChildrenOperations = {
    * @internal
    */
   processUpdates: function(updates, markupList) {
+    var i;
+    var j;
     var update;
     // Mapping from parent IDs to initial child orderings.
     var initialChildren = null;
     // List of children that will be moved or removed.
     var updatedChildren = null;
 
-    for (var i = 0; update = updates[i]; i++) {
+    for (i = 0; update = updates[i]; i++) {
       if (update.type === ReactMultiChildUpdateTypes.MOVE_EXISTING ||
           update.type === ReactMultiChildUpdateTypes.REMOVE_NODE) {
+        var updatedCount = update.nodeCount;
         var updatedIndex = update.fromIndex;
-        var updatedChild = update.parentNode.childNodes[updatedIndex];
         var parentID = update.parentID;
 
         initialChildren = initialChildren || {};
         initialChildren[parentID] = initialChildren[parentID] || [];
-        initialChildren[parentID][updatedIndex] = updatedChild;
-
         updatedChildren = updatedChildren || [];
-        updatedChildren.push(updatedChild);
+        for (j = 0; j < updatedCount; j++) {
+          var updatedChild = update.parentNode.childNodes[updatedIndex + j];
+          initialChildren[parentID][updatedIndex + j] = updatedChild;
+          updatedChildren.push(updatedChild);
+        }
       }
     }
 
@@ -107,12 +111,12 @@ var DOMChildrenOperations = {
 
     // Remove updated children first so that `toIndex` is consistent.
     if (updatedChildren) {
-      for (var j = 0; j < updatedChildren.length; j++) {
-        updatedChildren[j].parentNode.removeChild(updatedChildren[j]);
+      for (i = 0; i < updatedChildren.length; i++) {
+        updatedChildren[i].parentNode.removeChild(updatedChildren[i]);
       }
     }
 
-    for (var k = 0; update = updates[k]; k++) {
+    for (i = 0; update = updates[i]; i++) {
       switch (update.type) {
         case ReactMultiChildUpdateTypes.INSERT_MARKUP:
           insertChildAt(
@@ -128,11 +132,13 @@ var DOMChildrenOperations = {
           );
           break;
         case ReactMultiChildUpdateTypes.MOVE_EXISTING:
-          insertChildAt(
-            update.parentNode,
-            initialChildren[update.parentID][update.fromIndex],
-            update.toIndex
-          );
+          for (j = update.nodeCount; j-- > 0;) {
+            insertChildAt(
+              update.parentNode,
+              initialChildren[update.parentID][update.fromIndex + j],
+              update.toIndex
+            );
+          }
           break;
         case ReactMultiChildUpdateTypes.TEXT_CONTENT:
           update.parentNode[textContentAccessor] = update.textContent;

@@ -80,8 +80,9 @@ function enqueueMarkup(parentID, markup, toIndex) {
     parentNode: null,
     type: ReactMultiChildUpdateTypes.INSERT_MARKUP,
     markupIndex: markupQueue.push(markup) - 1,
-    fromIndex: null,
     textContent: null,
+    nodeCount: null,
+    fromIndex: null,
     toIndex: toIndex
   });
 }
@@ -103,6 +104,7 @@ function enqueueReplaceWithMarkup(parentID, markup) {
     type: ReactMultiChildUpdateTypes.REPLACE_WITH_MARKUP,
     markupIndex: markupQueue.push(markup) - 1,
     textContent: null,
+    nodeCount: null,
     fromIndex: null,
     toIndex: null
   });
@@ -116,7 +118,7 @@ function enqueueReplaceWithMarkup(parentID, markup) {
  * @param {number} toIndex Destination index of the element.
  * @private
  */
-function enqueueMove(parentID, fromIndex, toIndex) {
+function enqueueMove(parentID, nodeCount, fromIndex, toIndex) {
   // NOTE: Null values reduce hidden classes.
   updateQueue.push({
     parentID: parentID,
@@ -124,6 +126,7 @@ function enqueueMove(parentID, fromIndex, toIndex) {
     type: ReactMultiChildUpdateTypes.MOVE_EXISTING,
     markupIndex: null,
     textContent: null,
+    nodeCount: nodeCount,
     fromIndex: fromIndex,
     toIndex: toIndex
   });
@@ -136,7 +139,7 @@ function enqueueMove(parentID, fromIndex, toIndex) {
  * @param {number} fromIndex Index of the element to remove.
  * @private
  */
-function enqueueRemove(parentID, fromIndex) {
+function enqueueRemove(parentID, nodeCount, fromIndex) {
   // NOTE: Null values reduce hidden classes.
   updateQueue.push({
     parentID: parentID,
@@ -144,6 +147,7 @@ function enqueueRemove(parentID, fromIndex) {
     type: ReactMultiChildUpdateTypes.REMOVE_NODE,
     markupIndex: null,
     textContent: null,
+    nodeCount: nodeCount,
     fromIndex: fromIndex,
     toIndex: null
   });
@@ -164,6 +168,7 @@ function enqueueTextContent(parentID, textContent) {
     type: ReactMultiChildUpdateTypes.TEXT_CONTENT,
     markupIndex: null,
     textContent: textContent,
+    nodeCount: null,
     fromIndex: null,
     toIndex: null
   });
@@ -207,15 +212,20 @@ function clearQueue() {
 function mountChildren(component, idPrefix, children, transaction) {
   var mountImages = [];
   var index = 0;
+  var lastChild = null;
   for (var name in children) {
     var child = children[name];
     if (children.hasOwnProperty(name) && child) {
       var rootID = idPrefix + name;
       var mountImage = child.mountComponent(rootID, transaction);
-      child._mountIndex = index;
+      if (!lastChild) {
+        component._firstRenderedChild = child;
+      }
       child._parentComponent = component;
+      child._previousSibling = lastChild;
       mountImages.push(mountImage);
       index += child._nodeCount;
+      lastChild = child;
     }
   }
   component._renderedChildren = children;
@@ -332,10 +342,32 @@ function _updateChildren(
     return;
   }
   var name;
+  var nodeCountBefore = 0;
+  var comp = component._firstRenderedChild;
+  while (comp && comp._rootNodeID !== nodeID) {
+    while (comp._previousSibling) {
+      comp = comp._previousSibling;
+      nodeCountBefore += comp._nodeCount;
+    }
+    comp = comp._parentComponent;
+  }
+  invariant(nodeCountBefore === 0, 'y');
+  var lastIndex = nodeCountBefore;
+  for (name in prevChildren) {
+    if (!prevChildren.hasOwnProperty(name)) {
+      continue;
+    }
+    var prevChild = prevChildren[name];
+    if (prevChild) {
+      prevChild._mountIndex = lastIndex;
+      lastIndex += prevChild._nodeCount;
+    }
+  }
   // `nextIndex` will increment for each child node in `nextChildren`, but
   // `lastIndex` will be the last index visited in `prevChildren`.
-  var lastIndex = 0;
   var nextIndex = 0;
+  lastIndex = 0;
+  var lastChild = null;
   for (name in nextChildren) {
     if (!nextChildren.hasOwnProperty(name)) {
       continue;
@@ -344,10 +376,9 @@ function _updateChildren(
     var nextChild = nextChildren[name];
     var mountedChild = null;
     if (shouldUpdateChild(prevChild, nextChild)) {
-      moveChild(nodeID, prevChild, nextIndex, lastIndex);
       lastIndex = Math.max(prevChild._mountIndex, lastIndex);
       prevChild.receiveProps(nextChild.props, transaction);
-      prevChild._mountIndex = nextIndex;
+      moveChild(nodeID, prevChild, nextIndex, lastIndex);
       mountedChild = prevChild;
     } else {
       if (prevChild) {
@@ -369,7 +400,12 @@ function _updateChildren(
       }
     }
     if (mountedChild) {
+      if (!lastChild) {
+        component._firstRenderedChild = mountedChild;
+      }
+      mountedChild._previousSibling = lastChild;
       nextIndex += mountedChild._nodeCount;
+      lastChild = mountedChild;
     }
   }
   // Remove children that are no longer present.
@@ -404,6 +440,7 @@ function unmountChildren(component) {
     if (renderedChild && renderedChild.unmountComponent) {
       renderedChild._mountIndex = null;
       renderedChild._parentComponent = null;
+      renderedChild._previousSibling = null;
       renderedChild.unmountComponent();
     }
   }
@@ -425,7 +462,7 @@ function moveChild(nodeID, child, toIndex, lastIndex) {
   // be moved. Otherwise, we do not need to move it because a child will be
   // inserted or moved before `child`.
   if (child._mountIndex < lastIndex) {
-    enqueueMove(nodeID, child._mountIndex, toIndex);
+    enqueueMove(nodeID, child._nodeCount, child._mountIndex, toIndex);
   }
 }
 
@@ -449,7 +486,7 @@ function createChild(nodeID, child, mountImage) {
  * @protected
  */
 function removeChild(nodeID, child) {
-  enqueueRemove(nodeID, child._mountIndex);
+  enqueueRemove(nodeID, child._nodeCount, child._mountIndex);
 }
 
 /**
@@ -488,7 +525,6 @@ function _mountChildByNameAtIndex(
   // Inlined for performance, see `ReactInstanceHandles.createReactID`.
   var rootID = idPrefix + name;
   var mountImage = child.mountComponent(rootID, transaction);
-  child._mountIndex = index;
   child._parentComponent = component;
   createChild(nodeID, child, mountImage);
   component._renderedChildren = component._renderedChildren || {};
@@ -511,6 +547,7 @@ function _unmountChildByName(component, nodeID, child, name) {
     removeChild(nodeID, child);
     child._mountIndex = null;
     child._parentComponent = null;
+    child._previousSibling = null;
     child.unmountComponent();
     delete component._renderedChildren[name];
   }
