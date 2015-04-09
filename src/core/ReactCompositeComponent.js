@@ -31,6 +31,12 @@ var invariant = require('invariant');
 var shouldUpdateReactComponent = require('shouldUpdateReactComponent');
 var warning = require('warning');
 
+/**
+ * Used to indicate that no error has been thrown (since you can actually throw
+ * null, undefined, and seemingly anything else).
+ */
+var NO_ERROR = {};
+
 function getDeclarationErrorAddendum(component) {
   var owner = component._currentElement._owner || null;
   if (owner) {
@@ -99,6 +105,8 @@ var ReactCompositeComponentMixin = {
     this._pendingStateQueue = null;
     this._pendingReplaceState = false;
     this._pendingForceUpdate = false;
+
+    this._caughtError = NO_ERROR;
 
     this._renderedComponent = null;
 
@@ -210,6 +218,37 @@ var ReactCompositeComponentMixin = {
     this._pendingReplaceState = false;
     this._pendingForceUpdate = false;
 
+    var markup;
+    if (inst.renderError) {
+      var checkpoint = transaction.checkpoint();
+      try {
+        markup = this.performInitialMount(rootID, transaction, context);
+      } catch (e) {
+        this._caughtError = e;
+        this.unmountComponent();
+
+        transaction.rollback(checkpoint);
+
+        // Try again -- this time we'll call renderError because _caughtError
+        // has been set. If this throws again, the error will bubble up (and
+        // can be caught by a higher error boundary).
+        markup = this.performInitialMount(rootID, transaction, context);
+        // Don't call componentDidMount
+        return markup;
+      }
+    } else {
+      markup = this.performInitialMount(rootID, transaction, context);
+    }
+
+    if (inst.componentDidMount) {
+      transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
+    }
+
+    return markup;
+  },
+
+  performInitialMount: function(rootID, transaction, context) {
+    var inst = this._instance;
     var renderedElement;
 
     var previouslyMounting = ReactLifeCycle.currentlyMountingInstance;
@@ -240,9 +279,6 @@ var ReactCompositeComponentMixin = {
       transaction,
       this._processChildContext(context)
     );
-    if (inst.componentDidMount) {
-      transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
-    }
 
     return markup;
   },
@@ -266,8 +302,10 @@ var ReactCompositeComponentMixin = {
       }
     }
 
-    ReactReconciler.unmountComponent(this._renderedComponent);
-    this._renderedComponent = null;
+    if (this._renderedComponent) {
+      ReactReconciler.unmountComponent(this._renderedComponent);
+      this._renderedComponent = null;
+    }
 
     // Reset pending fields
     this._pendingStateQueue = null;
@@ -764,15 +802,20 @@ var ReactCompositeComponentMixin = {
    */
   _renderValidatedComponentWithoutOwnerOrContext: function() {
     var inst = this._instance;
-    var renderedComponent = inst.render();
-    if (__DEV__) {
-      // We allow auto-mocks to proceed as if they're returning null.
-      if (typeof renderedComponent === 'undefined' &&
-          inst.render._isMockFunction) {
-        // This is probably bad practice. Consider warning here and
-        // deprecating this convenience.
-        renderedComponent = null;
+    var renderedComponent;
+    if (this._caughtError === NO_ERROR) {
+      renderedComponent = inst.render();
+      if (__DEV__) {
+        // We allow auto-mocks to proceed as if they're returning null.
+        if (typeof renderedComponent === 'undefined' &&
+            inst.render._isMockFunction) {
+          // This is probably bad practice. Consider warning here and
+          // deprecating this convenience.
+          renderedComponent = null;
+        }
       }
+    } else {
+      renderedComponent = inst.renderError(this._caughtError);
     }
 
     return renderedComponent;
