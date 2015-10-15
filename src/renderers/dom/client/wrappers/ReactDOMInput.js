@@ -11,8 +11,9 @@
 
 'use strict';
 
-var ReactDOMIDOperations = require('ReactDOMIDOperations');
+var DOMPropertyOperations = require('DOMPropertyOperations');
 var LinkedValueUtils = require('LinkedValueUtils');
+var ReactDOMComponentTree = require('ReactDOMComponentTree');
 var ReactMount = require('ReactMount');
 var ReactUpdates = require('ReactUpdates');
 
@@ -130,8 +131,8 @@ var ReactDOMInput = {
     // TODO: Shouldn't this be getChecked(props)?
     var checked = props.checked;
     if (checked != null) {
-      ReactDOMIDOperations.updatePropertyByID(
-        inst._rootNodeID,
+      DOMPropertyOperations.setValueForProperty(
+        ReactDOMComponentTree.getNodeFromInstance(inst),
         'checked',
         checked || false
       );
@@ -141,8 +142,8 @@ var ReactDOMInput = {
     if (value != null) {
       // Cast `value` to a string to ensure the value is set correctly. While
       // browsers typically do this as necessary, jsdom doesn't.
-      ReactDOMIDOperations.updatePropertyByID(
-        inst._rootNodeID,
+      DOMPropertyOperations.setValueForProperty(
+        ReactDOMComponentTree.getNodeFromInstance(inst),
         'value',
         '' + value
       );
@@ -162,7 +163,7 @@ function _handleChange(event) {
 
   var name = props.name;
   if (props.type === 'radio' && name != null) {
-    var rootNode = ReactMount.getNode(this._rootNodeID);
+    var rootNode = ReactDOMComponentTree.getNodeFromInstance(this);
     var queryRoot = rootNode;
 
     while (queryRoot.parentNode) {
