@@ -102,12 +102,6 @@ var EventPluginHub = {
   injection: {
 
     /**
-     * @param {object} InjectedMount
-     * @public
-     */
-    injectMount: EventPluginUtils.injection.injectMount,
-
-    /**
      * @param {object} InjectedInstanceHandle
      * @public
      */
@@ -218,17 +212,12 @@ var EventPluginHub = {
    * Allows registered plugins an opportunity to extract events from top-level
    * native browser events.
    *
-   * @param {string} topLevelType Record from `EventConstants`.
-   * @param {DOMEventTarget} topLevelTarget The listening component root node.
-   * @param {string} topLevelTargetID ID of `topLevelTarget`.
-   * @param {object} nativeEvent Native browser event.
    * @return {*} An accumulation of synthetic events.
    * @internal
    */
   extractEvents: function(
       topLevelType,
-      topLevelTarget,
-      topLevelTargetID,
+      targetInst,
       nativeEvent,
       nativeEventTarget) {
     var events;
@@ -239,8 +228,7 @@ var EventPluginHub = {
       if (possiblePlugin) {
         var extractedEvents = possiblePlugin.extractEvents(
           topLevelType,
-          topLevelTarget,
-          topLevelTargetID,
+          targetInst,
           nativeEvent,
           nativeEventTarget
         );
