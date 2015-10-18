@@ -19,7 +19,6 @@ var ReactPerf = require('ReactPerf');
 var accumulateInto = require('accumulateInto');
 var forEachAccumulated = require('forEachAccumulated');
 var invariant = require('invariant');
-var warning = require('warning');
 
 /**
  * Internal store for event listeners
@@ -56,23 +55,6 @@ var executeDispatchesAndReleaseTopLevel = function(e) {
 };
 
 /**
- * - `InstanceHandle`: [required] Module that performs logical traversals of DOM
- *   hierarchy given ids of the logical DOM elements involved.
- */
-var InstanceHandle = null;
-
-function validateInstanceHandle() {
-  var valid =
-    InstanceHandle &&
-    InstanceHandle.traverseTwoPhase &&
-    InstanceHandle.traverseEnterLeave;
-  warning(
-    valid,
-    'InstanceHandle not injected before use!'
-  );
-}
-
-/**
  * This is a unified interface for event plugins to be installed and configured.
  *
  * Event plugins can implement the following properties:
@@ -100,24 +82,6 @@ var EventPluginHub = {
    * Methods for injecting dependencies.
    */
   injection: {
-
-    /**
-     * @param {object} InjectedInstanceHandle
-     * @public
-     */
-    injectInstanceHandle: function(InjectedInstanceHandle) {
-      InstanceHandle = InjectedInstanceHandle;
-      if (__DEV__) {
-        validateInstanceHandle();
-      }
-    },
-
-    getInstanceHandle: function() {
-      if (__DEV__) {
-        validateInstanceHandle();
-      }
-      return InstanceHandle;
-    },
 
     /**
      * @param {array} InjectedEventPluginOrder
