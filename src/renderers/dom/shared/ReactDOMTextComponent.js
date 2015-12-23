@@ -12,6 +12,7 @@
 'use strict';
 
 var DOMChildrenOperations = require('DOMChildrenOperations');
+var DOMNamespaces = require('DOMNamespaces');
 var DOMLazyTree = require('DOMLazyTree');
 var DOMPropertyOperations = require('DOMPropertyOperations');
 var ReactDOMComponentTree = require('ReactDOMComponentTree');
@@ -89,12 +90,21 @@ assign(ReactDOMTextComponent.prototype, {
       }
     }
 
+    var namespaceURI = nativeParent._namespaceURI;
+    var isSVG = namespaceURI === DOMNamespaces.svg;
+    var tag = isSVG ? 'tspan' : 'span';
+
     var domID = nativeContainerInfo._idCounter++;
     this._domID = domID;
     this._nativeParent = nativeParent;
     if (transaction.useCreateElement) {
       var ownerDocument = nativeContainerInfo._ownerDocument;
-      var el = ownerDocument.createElement('span');
+      var el;
+      if (isSVG) {
+        el = ownerDocument.createElementNS(namespaceURI, tag);
+      } else {
+        el = ownerDocument.createElement(tag);
+      }
       ReactDOMComponentTree.precacheNode(this, el);
       var lazyTree = DOMLazyTree(el);
       DOMLazyTree.queueText(lazyTree, this._stringText);
@@ -110,9 +120,9 @@ assign(ReactDOMTextComponent.prototype, {
       }
 
       return (
-        '<span ' + DOMPropertyOperations.createMarkupForID(domID) + '>' +
+        '<' + tag + ' ' + DOMPropertyOperations.createMarkupForID(domID) + '>' +
           escapedText +
-        '</span>'
+        '</' + tag + '>'
       );
     }
   },

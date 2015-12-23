@@ -30,4 +30,13 @@ describe('ReactDOMSVG', function() {
     expect(markup).toContain('xlink:href="http://i.imgur.com/w7GCRPb.png"');
   });
 
+  it('creates tspan for text components', function() {
+    var markup = ReactDOMServer.renderToString(
+      <svg>
+        <text>a{'b'}</text>
+      </svg>
+    );
+    expect(markup).toContain('<tspan');
+  });
+
 });
