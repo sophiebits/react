@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<script src="react-0.14.0.prod.js"></script>
+<script src="bench-pe-es5.js"></script>
+<body>
+<script>
+console.profile('x');
+var x = React.render(React.createElement(Benchmark),document.body);
+setTimeout(function(){
+console.profileEnd('x');
+})
+</script>
