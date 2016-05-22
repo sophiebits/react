@@ -472,6 +472,86 @@ function ReactDOMComponent(element) {
   }
 }
 
+ReactDOMComponent.omittedCloseTags = omittedCloseTags;
+
+/**
+ * Creates markup for the open tag and attributes. Does not include closing ">".
+ *
+ * When instForListeners and transactionForListeners are passed, this method
+ * has side effects because events get registered.
+ */
+ReactDOMComponent.createOpenTagMarkupAndPutListeners = function(
+  tagVerbatim,
+  tagLowercase,
+  props,
+  renderToStaticMarkup,
+  isRootElement,
+  domID,
+
+  // Passed only on client render:
+  instForDebug,
+  instForListeners,
+  transactionForListeners
+) {
+  var ret = '<' + tagVerbatim;
+
+  for (var propKey in props) {
+    if (!props.hasOwnProperty(propKey)) {
+      continue;
+    }
+    var propValue = props[propKey];
+    if (propValue == null) {
+      continue;
+    }
+    if (registrationNameModules.hasOwnProperty(propKey)) {
+      if (propValue && instForListeners) {
+        enqueuePutListener(
+          instForListeners,
+          propKey,
+          propValue,
+          transactionForListeners
+        );
+      }
+    } else {
+      if (propKey === STYLE) {
+        propValue = CSSPropertyOperations.createMarkupForStyles(
+          propValue,
+          instForDebug
+        );
+      }
+      var markup = null;
+      if (isCustomComponent(tagLowercase, props)) {
+        if (!RESERVED_PROPS.hasOwnProperty(propKey)) {
+          markup = DOMPropertyOperations.createMarkupForCustomAttribute(
+            propKey,
+            propValue
+          );
+        }
+      } else {
+        markup = DOMPropertyOperations.createMarkupForProperty(
+          propKey,
+          propValue
+        );
+      }
+      if (markup) {
+        ret += ' ' + markup;
+      }
+    }
+  }
+
+  // For static pages, no need to put React ID and checksum. Saves lots of
+  // bytes.
+  if (renderToStaticMarkup) {
+    return ret;
+  }
+
+  if (isRootElement) {
+    ret += ' ' + DOMPropertyOperations.createMarkupForRoot();
+  }
+  ret += ' ' + DOMPropertyOperations.createMarkupForID(domID);
+  return ret;
+};
+
 ReactDOMComponent.displayName = 'ReactDOMComponent';
 
 ReactDOMComponent.Mixin = {
@@ -611,7 +691,23 @@ ReactDOMComponent.Mixin = {
       this._createInitialChildren(transaction, props, context, lazyTree);
       mountImage = lazyTree;
     } else {
-      var tagOpen = this._createOpenTagMarkupAndPutListeners(transaction, props);
+      // TODO: Style stuff extracted from createOpenTagMarkupAndPutListeners.
+      // Move it to a better spot.
+      if (__DEV__) {
+        this._previousStyle = props.style;
+      }
+      this._previousStyleCopy = Object.assign({}, props.style);
+      var tagOpen = ReactDOMComponent.createOpenTagMarkupAndPutListeners(
+        this._currentElement.type,
+        this._tag,
+        props,
+        transaction.renderToStaticMarkup,
+        !this._hostParent,
+        this._domID,
+        this,
+        this,
+        transaction
+      );
       var tagContent = this._createContentMarkup(transaction, props, context);
       if (!tagContent && omittedCloseTags[this._tag]) {
         mountImage = tagOpen + '/>';
@@ -641,72 +737,6 @@ ReactDOMComponent.Mixin = {
     }
 
     return mountImage;
-  },
-
-  /**
-   * Creates markup for the open tag and all attributes.
-   *
-   * This method has side effects because events get registered.
-   *
-   * Iterating over object properties is faster than iterating over arrays.
-   * @see http://jsperf.com/obj-vs-arr-iteration
-   *
-   * @private
-   * @param {ReactReconcileTransaction|ReactServerRenderingTransaction} transaction
-   * @param {object} props
-   * @return {string} Markup of opening tag.
-   */
-  _createOpenTagMarkupAndPutListeners: function(transaction, props) {
-    var ret = '<' + this._currentElement.type;
-
-    for (var propKey in props) {
-      if (!props.hasOwnProperty(propKey)) {
-        continue;
-      }
-      var propValue = props[propKey];
-      if (propValue == null) {
-        continue;
-      }
-      if (registrationNameModules.hasOwnProperty(propKey)) {
-        if (propValue) {
-          enqueuePutListener(this, propKey, propValue, transaction);
-        }
-      } else {
-        if (propKey === STYLE) {
-          if (propValue) {
-            if (__DEV__) {
-              // See `_updateDOMProperties`. style block
-              this._previousStyle = propValue;
-            }
-            propValue = this._previousStyleCopy = Object.assign({}, props.style);
-          }
-          propValue = CSSPropertyOperations.createMarkupForStyles(propValue, this);
-        }
-        var markup = null;
-        if (this._tag != null && isCustomComponent(this._tag, props)) {
-          if (!RESERVED_PROPS.hasOwnProperty(propKey)) {
-            markup = DOMPropertyOperations.createMarkupForCustomAttribute(propKey, propValue);
-          }
-        } else {
-          markup = DOMPropertyOperations.createMarkupForProperty(propKey, propValue);
-        }
-        if (markup) {
-          ret += ' ' + markup;
-        }
-      }
-    }
-
-    // For static pages, no need to put React ID and checksum. Saves lots of
-    // bytes.
-    if (transaction.renderToStaticMarkup) {
-      return ret;
-    }
-
-    if (!this._hostParent) {
-      ret += ' ' + DOMPropertyOperations.createMarkupForRoot();
-    }
-    ret += ' ' + DOMPropertyOperations.createMarkupForID(this._domID);
-    return ret;
   },
 
   /**

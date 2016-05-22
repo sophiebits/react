@@ -172,7 +172,10 @@ var CSSPropertyOperations = {
       }
       var styleValue = styles[styleName];
       if (__DEV__) {
-        warnValidStyle(styleName, styleValue, component);
+        // `component` omitted on SSR.
+        if (component) {
+          warnValidStyle(styleName, styleValue, component);
+        }
       }
       if (styleValue != null) {
         serialized += processStyleName(styleName) + ':';
