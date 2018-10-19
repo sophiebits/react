@@ -31,14 +31,12 @@ import {
   HostPortal,
   ContextProvider,
   ContextConsumer,
-  ForwardRef,
   Fragment,
   Mode,
   Profiler,
   SuspenseComponent,
-  ForwardRefLazy,
-  PureComponent,
-  PureComponentLazy,
+  ModdedFunctionComponent,
+  ModdedFunctionComponentLazy,
 } from 'shared/ReactWorkTags';
 import {Placement, Ref, Update} from 'shared/ReactSideEffectTags';
 import invariant from 'shared/invariant';
@@ -543,6 +541,8 @@ function completeWork(
       break;
     case FunctionComponent:
     case FunctionComponentLazy:
+    case ModdedFunctionComponent:
+    case ModdedFunctionComponentLazy:
       break;
     case ClassComponent: {
       const Component = workInProgress.type;
@@ -693,9 +693,6 @@ function completeWork(
       }
       break;
     }
-    case ForwardRef:
-    case ForwardRefLazy:
-      break;
     case SuspenseComponent: {
       const nextState = workInProgress.memoizedState;
       const prevState = current !== null ? current.memoizedState : null;
@@ -723,9 +720,6 @@ function completeWork(
       popProvider(workInProgress);
       break;
     case ContextConsumer:
-      break;
-    case PureComponent:
-    case PureComponentLazy:
       break;
     default:
       invariant(

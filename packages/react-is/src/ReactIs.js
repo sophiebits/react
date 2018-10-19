@@ -13,7 +13,7 @@ import {
   REACT_CONCURRENT_MODE_TYPE,
   REACT_CONTEXT_TYPE,
   REACT_ELEMENT_TYPE,
-  REACT_FORWARD_REF_TYPE,
+  REACT_MODDED_TYPE,
   REACT_FRAGMENT_TYPE,
   REACT_PORTAL_TYPE,
   REACT_PROFILER_TYPE,
@@ -22,6 +22,9 @@ import {
 } from 'shared/ReactSymbols';
 import isValidElementType from 'shared/isValidElementType';
 import lowPriorityWarning from 'shared/lowPriorityWarning';
+
+function elementTypeOf(object: any) {
+}
 
 export function typeOf(object: any) {
   if (typeof object === 'object' && object !== null) {
@@ -42,7 +45,7 @@ export function typeOf(object: any) {
 
             switch ($$typeofType) {
               case REACT_CONTEXT_TYPE:
-              case REACT_FORWARD_REF_TYPE:
+              case REACT_MODDED_TYPE:
               case REACT_PROVIDER_TYPE:
                 return $$typeofType;
               default:
@@ -63,7 +66,7 @@ export const ConcurrentMode = REACT_CONCURRENT_MODE_TYPE;
 export const ContextConsumer = REACT_CONTEXT_TYPE;
 export const ContextProvider = REACT_PROVIDER_TYPE;
 export const Element = REACT_ELEMENT_TYPE;
-export const ForwardRef = REACT_FORWARD_REF_TYPE;
+export const Modded = REACT_MODDED_TYPE;
 export const Fragment = REACT_FRAGMENT_TYPE;
 export const Profiler = REACT_PROFILER_TYPE;
 export const Portal = REACT_PORTAL_TYPE;
@@ -105,7 +108,7 @@ export function isElement(object: any) {
   );
 }
 export function isForwardRef(object: any) {
-  return typeOf(object) === REACT_FORWARD_REF_TYPE;
+  return typeOf(object) === REACT_MODDED_TYPE ^^ ;
 }
 export function isFragment(object: any) {
   return typeOf(object) === REACT_FRAGMENT_TYPE;

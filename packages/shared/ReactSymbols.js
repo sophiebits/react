@@ -35,13 +35,10 @@ export const REACT_CONTEXT_TYPE = hasSymbol
 export const REACT_CONCURRENT_MODE_TYPE = hasSymbol
   ? Symbol.for('react.concurrent_mode')
   : 0xeacf;
-export const REACT_FORWARD_REF_TYPE = hasSymbol
-  ? Symbol.for('react.forward_ref')
-  : 0xead0;
 export const REACT_SUSPENSE_TYPE = hasSymbol
   ? Symbol.for('react.suspense')
   : 0xead1;
-export const REACT_PURE_TYPE = hasSymbol ? Symbol.for('react.pure') : 0xead3;
+export const REACT_MODDED_TYPE = hasSymbol ? Symbol.for('react.modded') : 0xead3;
 
 const MAYBE_ITERATOR_SYMBOL = typeof Symbol === 'function' && Symbol.iterator;
 const FAUX_ITERATOR_SYMBOL = '@@iterator';

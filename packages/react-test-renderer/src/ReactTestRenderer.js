@@ -27,11 +27,9 @@ import {
   ContextConsumer,
   ContextProvider,
   Mode,
-  ForwardRef,
   Profiler,
-  ForwardRefLazy,
-  PureComponent,
-  PureComponentLazy,
+  ModdedFunctionComponent,
+  ModdedFunctionComponentLazy,
 } from 'shared/ReactWorkTags';
 import invariant from 'shared/invariant';
 import ReactVersion from 'shared/ReactVersion';
@@ -181,16 +179,26 @@ function toTree(node: ?Fiber) {
       };
     }
     case FunctionComponent:
+    case ModdedFunctionComponent: {
+      let type = node.type;
+      if (node.tag === ModdedFunctionComponent) {
+        type = type.render;
+      }
       return {
         nodeType: 'component',
-        type: node.type,
+        type: type,
         props: {...node.memoizedProps},
         instance: null,
         rendered: childrenToTree(node.child),
       };
-    case FunctionComponentLazy: {
+    }
+    case FunctionComponentLazy:
+    case ModdedFunctionComponentLazy: {
       const thenable = node.type;
-      const type = thenable._reactResult;
+      let type = thenable._reactResult;
+      if (node.tag === ModdedFunctionComponentLazy) {
+        type = type.render;
+      }
       return {
         nodeType: 'component',
         type: type,
@@ -215,10 +223,6 @@ function toTree(node: ?Fiber) {
     case ContextConsumer:
     case Mode:
     case Profiler:
-    case ForwardRef:
-    case ForwardRefLazy:
-    case PureComponent:
-    case PureComponentLazy:
       return childrenToTree(node.child);
     default:
       invariant(
@@ -232,13 +236,11 @@ function toTree(node: ?Fiber) {
 const validWrapperTypes = new Set([
   FunctionComponent,
   FunctionComponentLazy,
+  ModdedFunctionComponent,
+  ModdedFunctionComponentLazy,
   ClassComponent,
   ClassComponentLazy,
   HostComponent,
-  ForwardRef,
-  ForwardRefLazy,
-  PureComponent,
-  PureComponentLazy,
   // Normally skipped, but used when there's more than one root child.
   HostRoot,
 ]);

@@ -27,7 +27,6 @@ import {
   HostComponent,
   HostText,
   HostPortal,
-  ForwardRef,
   Fragment,
   Mode,
   ContextProvider,
@@ -36,9 +35,8 @@ import {
   SuspenseComponent,
   FunctionComponentLazy,
   ClassComponentLazy,
-  ForwardRefLazy,
-  PureComponent,
-  PureComponentLazy,
+  ModdedFunctionComponent,
+  ModdedFunctionComponentLazy,
 } from 'shared/ReactWorkTags';
 import getComponentName from 'shared/getComponentName';
 
@@ -51,7 +49,6 @@ import {
   StrictMode,
 } from './ReactTypeOfMode';
 import {
-  REACT_FORWARD_REF_TYPE,
   REACT_FRAGMENT_TYPE,
   REACT_STRICT_MODE_TYPE,
   REACT_PROFILER_TYPE,
@@ -59,7 +56,7 @@ import {
   REACT_CONTEXT_TYPE,
   REACT_CONCURRENT_MODE_TYPE,
   REACT_SUSPENSE_TYPE,
-  REACT_PURE_TYPE,
+  REACT_MODDED_TYPE,
 } from 'shared/ReactSymbols';
 
 let hasBadMapPolyfill;
@@ -305,11 +302,8 @@ export function resolveLazyComponentTag(
       : FunctionComponentLazy;
   } else if (Component !== undefined && Component !== null) {
     const $$typeof = Component.$$typeof;
-    if ($$typeof === REACT_FORWARD_REF_TYPE) {
-      return ForwardRefLazy;
-    }
-    if ($$typeof === REACT_PURE_TYPE) {
-      return PureComponentLazy;
+    if ($$typeof === REACT_MODDED_TYPE) {
+      return ModdedFunctionComponentLazy;
     }
   }
   return IndeterminateComponent;
@@ -455,11 +449,8 @@ export function createFiberFromElement(
               // This is a consumer
               fiberTag = ContextConsumer;
               break getTag;
-            case REACT_FORWARD_REF_TYPE:
-              fiberTag = ForwardRef;
-              break getTag;
-            case REACT_PURE_TYPE:
-              fiberTag = PureComponent;
+            case REACT_MODDED_TYPE:
+              fiberTag = ModdedFunctionComponent;
               break getTag;
             default: {
               if (typeof type.then === 'function') {

@@ -25,16 +25,14 @@ import {
   HostComponent,
   HostText,
   HostPortal,
-  ForwardRef,
-  ForwardRefLazy,
+  ModdedFunctionComponent,
+  ModdedFunctionComponentLazy,
   Fragment,
   Mode,
   ContextProvider,
   ContextConsumer,
   Profiler,
   SuspenseComponent,
-  PureComponent,
-  PureComponentLazy,
 } from 'shared/ReactWorkTags';
 import {
   NoEffect,
@@ -233,7 +231,7 @@ function updateForwardRef(
   return workInProgress.child;
 }
 
-function updatePureComponent(
+function updateModdedFunctionComponent(
   current: Fiber | null,
   workInProgress: Fiber,
   Component: any,
@@ -242,17 +240,41 @@ function updatePureComponent(
   renderExpirationTime: ExpirationTime,
 ) {
   const render = Component.render;
+  const flags = Component.flags;
 
-  if (
-    current !== null &&
-    (updateExpirationTime === NoWork ||
-      updateExpirationTime > renderExpirationTime)
-  ) {
-    const prevProps = current.memoizedProps;
-    // Default to shallow comparison
-    let compare = Component.compare;
-    compare = compare !== null ? compare : shallowEqual;
-    if (compare(prevProps, nextProps)) {
+  const ref = workInProgress.ref;
+
+  const needsRerenderDueToRefChange =
+    (flags & ForwardRef) === NoMod
+      ? false
+      : current !== null
+        ? current.ref !== ref
+        : true;
+
+  if ((flags & Pure) !== NoMod) {
+    if (
+      current !== null &&
+      (updateExpirationTime === NoWork ||
+        updateExpirationTime > renderExpirationTime)
+    ) {
+      const prevProps = current.memoizedProps;
+      // Default to shallow comparison
+      let compare = Component.compare;
+      compare = compare !== null ? compare : shallowEqual;
+      if (!needsRerenderDueToRefChange && compare(prevProps, nextProps)) {
+        return bailoutOnAlreadyFinishedWork(
+          current,
+          workInProgress,
+          renderExpirationTime,
+        );
+      }
+    }
+  } else {
+    if (hasLegacyContextChanged()) {
+      // Normally we can bail out on props equality but if context has changed
+      // we don't do the bailout and we have to reuse existing props instead.
+    } else if (!needsRerenderDueToRefChange && workInProgress.memoizedProps === nextProps) {
+      // TODO: Code before this already bails out in this case. It shouldn't.
       return bailoutOnAlreadyFinishedWork(
         current,
         workInProgress,
@@ -264,13 +286,24 @@ function updatePureComponent(
   // The rest is a fork of updateFunctionComponent
   let nextChildren;
   prepareToReadContext(workInProgress, renderExpirationTime);
-  if (__DEV__) {
-    ReactCurrentOwner.current = workInProgress;
-    ReactCurrentFiber.setCurrentPhase('render');
-    nextChildren = render(nextProps);
-    ReactCurrentFiber.setCurrentPhase(null);
+  if ((flags & ForwardRef) !== NoMod) {
+    if (__DEV__) {
+      ReactCurrentOwner.current = workInProgress;
+      ReactCurrentFiber.setCurrentPhase('render');
+      nextChildren = render(nextProps, ref);
+      ReactCurrentFiber.setCurrentPhase(null);
+    } else {
+      nextChildren = render(nextProps, ref);
+    }
   } else {
-    nextChildren = render(nextProps);
+    if (__DEV__) {
+      ReactCurrentOwner.current = workInProgress;
+      ReactCurrentFiber.setCurrentPhase('render');
+      nextChildren = render(nextProps);
+      ReactCurrentFiber.setCurrentPhase(null);
+    } else {
+      nextChildren = render(nextProps);
+    }
   }
 
   // React DevTools reads this flag.
@@ -762,18 +795,8 @@ function mountIndeterminateComponent(
         );
         break;
       }
-      case ForwardRefLazy: {
-        child = updateForwardRef(
-          null,
-          workInProgress,
-          Component,
-          resolvedProps,
-          renderExpirationTime,
-        );
-        break;
-      }
-      case PureComponentLazy: {
-        child = updatePureComponent(
+      case ModdedFunctionComponentLazy: {
+        child = updateModdedFunctionComponent(
           null,
           workInProgress,
           Component,
@@ -1553,30 +1576,6 @@ function beginWork(
         workInProgress,
         renderExpirationTime,
       );
-    case ForwardRef: {
-      const type = workInProgress.type;
-      return updateForwardRef(
-        current,
-        workInProgress,
-        type,
-        workInProgress.pendingProps,
-        renderExpirationTime,
-      );
-    }
-    case ForwardRefLazy: {
-      const thenable = workInProgress.type;
-      const Component = getResultFromResolvedThenable(thenable);
-      const unresolvedProps = workInProgress.pendingProps;
-      const child = updateForwardRef(
-        current,
-        workInProgress,
-        Component,
-        resolveDefaultProps(Component, unresolvedProps),
-        renderExpirationTime,
-      );
-      workInProgress.memoizedProps = unresolvedProps;
-      return child;
-    }
     case Fragment:
       return updateFragment(current, workInProgress, renderExpirationTime);
     case Mode:
@@ -1595,9 +1594,9 @@ function beginWork(
         workInProgress,
         renderExpirationTime,
       );
-    case PureComponent: {
+    case ModdedFunctionComponent: {
       const type = workInProgress.type;
-      return updatePureComponent(
+      return updateModdedFunctionComponent(
         current,
         workInProgress,
         type,
@@ -1606,11 +1605,11 @@ function beginWork(
         renderExpirationTime,
       );
     }
-    case PureComponentLazy: {
+    case ModdedFunctionComponentLazy: {
       const thenable = workInProgress.type;
       const Component = getResultFromResolvedThenable(thenable);
       const unresolvedProps = workInProgress.pendingProps;
-      const child = updatePureComponent(
+      const child = updateModdedFunctionComponent(
         current,
         workInProgress,
         Component,

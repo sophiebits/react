@@ -5,8 +5,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {REACT_PURE_TYPE} from 'shared/ReactSymbols';
+import {REACT_MODDED_TYPE} from 'shared/ReactSymbols';
 
+import {Pure} from 'shared/ReactModTags';
 import warningWithoutStack from 'shared/warningWithoutStack';
 
 export default function pure<Props>(
@@ -33,7 +34,8 @@ export default function pure<Props>(
     }
   }
   return {
-    $$typeof: REACT_PURE_TYPE,
+    $$typeof: REACT_MODDED_TYPE,
+    flags: 0,
     render,
     compare: compare === undefined ? null : compare,
   };
