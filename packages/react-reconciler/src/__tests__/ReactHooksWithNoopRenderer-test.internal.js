@@ -3140,6 +3140,38 @@ function loadModules({
         ]);
       });
 
+      it('bails out after an odd number of updates', async () => {
+        let _setN;
+
+        function Counter() {
+          const [n, setN] = useState(0);
+          _setN = setN;
+          Scheduler.unstable_yieldValue('Render: ' + n);
+          return n;
+        }
+
+        const root = ReactNoop.createRoot(null);
+        await ReactNoop.act(async () => {
+          root.render(<Counter />);
+        });
+        expect(Scheduler).toHaveYielded([ 'Render: 0', ]);
+
+        await ReactNoop.act(async () => {
+          _setN(n => n);  // noop
+        });
+        expect(Scheduler).toHaveYielded([]);
+
+        await ReactNoop.act(async () => {
+          _setN(1);
+        });
+        expect(Scheduler).toHaveYielded([ 'Render: 1', ]);
+
+        await ReactNoop.act(async () => {
+          _setN(n => n);  // noop
+        });
+        expect(Scheduler).toHaveYielded([]);
+      });
+
       it('should update latest rendered reducer when a preceding state receives a render phase update', () => {
         // Similar to previous test, except using a preceding render phase update
         // instead of new props.
