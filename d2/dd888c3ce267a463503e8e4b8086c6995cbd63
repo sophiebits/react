@@ -1,0 +1,19 @@
+packages/react-dom/src/__tests__/ReactDOMInput-test.js
+  s_5a4fc0ce97110b::t_c1f2cbaf86f224 2664,2681
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d2dd888c3ce267a463503e8e4b8086c6995cbd63",
+  "prompts": {},
+  "sessions": {
+    "s_5a4fc0ce97110b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d1dd26d9-f07d-4b60-be42-fe7317712b1c",
+        "model": "unknown"
+      },
+      "human_author": "Sophie Alpert <git@sophiebits.com>"
+    }
+  }
+}
