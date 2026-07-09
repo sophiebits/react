@@ -1,0 +1,21 @@
+packages/react-reconciler/src/ReactFiberHooks.js
+  s_f3495d2b52371b::t_b117f8e9d08184 1612-1631,1643-1645
+packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.js
+  s_f3495d2b52371b::t_4d8fdcde24f96c 827-909
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "f33d9dc9ddca57151535a2b7a3d6b7b7c3da882a",
+  "prompts": {},
+  "sessions": {
+    "s_f3495d2b52371b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "12b962ca-8d28-438b-b3ab-8d1e1cf22480",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Sophie Alpert <git@sophiebits.com>"
+    }
+  }
+}
